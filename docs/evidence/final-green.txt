@@ -1,0 +1,42 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.2.0, pluggy-1.7.0 -- .venv\Scripts\python.exe
+rootdir: .
+configfile: pyproject.toml
+testpaths: tests
+plugins: platformdirs-4.14.8
+collecting ... collected 109 items / 77 deselected / 32 selected
+
+tests/test_seeded_bugs.py::test_b01_no_credential_literal_in_source PASSED [  3%]
+tests/test_seeded_bugs.py::test_b01_intel_key_comes_from_environment PASSED [  6%]
+tests/test_seeded_bugs.py::test_b01_intel_key_is_empty_when_not_configured PASSED [  9%]
+tests/test_seeded_bugs.py::test_b02_tautology_does_not_dump_every_event PASSED [ 12%]
+tests/test_seeded_bugs.py::test_b02_quote_in_a_name_is_treated_as_data PASSED [ 15%]
+tests/test_seeded_bugs.py::test_b02_union_cannot_read_outside_the_events_table PASSED [ 18%]
+tests/test_seeded_bugs.py::test_b03_dotdot_cannot_leave_reports_dir PASSED [ 21%]
+tests/test_seeded_bugs.py::test_b03_absolute_path_cannot_be_requested PASSED [ 25%]
+tests/test_seeded_bugs.py::test_b03_only_allowlisted_report_names_are_served PASSED [ 28%]
+tests/test_seeded_bugs.py::test_b04_python_tags_in_rules_do_not_execute PASSED [ 31%]
+tests/test_seeded_bugs.py::test_b04_reload_rejects_a_broken_rule_and_keeps_the_old_set PASSED [ 34%]
+tests/test_seeded_bugs.py::test_b04_duplicate_rule_ids_are_rejected PASSED [ 37%]
+tests/test_seeded_bugs.py::test_b05_missing_field_is_400_not_500 PASSED  [ 40%]
+tests/test_seeded_bugs.py::test_b05_json_array_is_400_not_500 PASSED     [ 43%]
+tests/test_seeded_bugs.py::test_b05_invalid_ip_is_rejected PASSED        [ 46%]
+tests/test_seeded_bugs.py::test_b05_oversized_body_is_413 PASSED         [ 50%]
+tests/test_seeded_bugs.py::test_b06_ingest_requires_an_api_key PASSED    [ 53%]
+tests/test_seeded_bugs.py::test_b06_admin_reload_requires_an_api_key PASSED [ 56%]
+tests/test_seeded_bugs.py::test_b06_wrong_api_key_is_rejected PASSED     [ 59%]
+tests/test_seeded_bugs.py::test_b06_entry_point_never_enables_debug PASSED [ 62%]
+tests/test_seeded_bugs.py::test_b07_credentials_in_headers_never_reach_the_log PASSED [ 65%]
+tests/test_seeded_bugs.py::test_b07_newline_cannot_forge_a_log_line PASSED [ 68%]
+tests/test_seeded_bugs.py::test_b07_password_in_message_is_redacted PASSED [ 71%]
+tests/test_seeded_bugs.py::test_b08_every_runtime_dependency_is_pinned_exactly PASSED [ 75%]
+tests/test_seeded_bugs.py::test_b08_requests_is_past_the_known_cves PASSED [ 78%]
+tests/test_seeded_bugs.py::test_b09_no_workflow_uses_pull_request_target PASSED [ 81%]
+tests/test_seeded_bugs.py::test_b09_workflow_tokens_are_least_privilege PASSED [ 84%]
+tests/test_seeded_bugs.py::test_b09_every_action_is_pinned_to_a_full_sha PASSED [ 87%]
+tests/test_seeded_bugs.py::test_b10_no_memory_note_tells_the_agent_to_bypass_controls PASSED [ 90%]
+tests/test_seeded_bugs.py::test_b10_agent_settings_deny_dangerous_actions PASSED [ 93%]
+tests/test_seeded_bugs.py::test_b10_guard_hook_blocks_push_to_main PASSED [ 96%]
+tests/test_seeded_bugs.py::test_b10_guard_hook_allows_ordinary_work PASSED [100%]
+
+====================== 32 passed, 77 deselected in 1.22s ======================
