@@ -36,4 +36,5 @@ register:
 # shows as a real failure. Saved as evidence on the baseline.
 evidence-red:
 	-AEGIS_SHOW_RED=1 $(PYTHON) -m pytest -q -m seeded_bug --tb=line -rf > docs/evidence/baseline-red.txt
-	@tail -n 3 docs/evidence/baseline-red.txt
+	$(PYTHON) scripts/mask_evidence.py docs/evidence/baseline-red.txt
+	@tail -n 1 docs/evidence/baseline-red.txt
