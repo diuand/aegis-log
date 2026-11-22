@@ -17,6 +17,5 @@ OPEN_BUGS = {
     "B-06",  # no authentication, debug=True
     "B-07",  # log injection and secrets in logs
     "B-08",  # unpinned and vulnerable dependencies
-    "B-09",  # insecure CI workflow
     "B-10",  # poisoned agent memory, no agent permission rules
 }
