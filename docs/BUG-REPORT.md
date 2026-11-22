@@ -13,7 +13,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-04 | Unsafe YAML rule loading | R-03 | fixed (PR #9) |
 | B-05 | No ingest validation or size cap | R-04 | fixed (PR #10) |
 | B-06 | No authentication; `debug=True` | R-05 | fixed (PR #11) |
-| B-07 | Log injection and secrets in logs | R-06 | open |
+| B-07 | Log injection and secrets in logs | R-06 | fixed (PR #12) |
 | B-08 | Unpinned and vulnerable dependencies | R-07 | open |
 | B-09 | Insecure CI workflow | R-08 | fixed (PR #4) |
 | B-10 | Poisoned agent memory; no agent permission rules | R-09 | fixed (PR #5) |
@@ -124,3 +124,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #11):** a `before_app_request` hook denies by default: every endpoint except `/health` requires `X-API-Key`, compared with `hmac.compare_digest` (constant time) against `AEGIS_API_KEY`; an empty configured key refuses every request. `make setup` writes a random key (`secrets.token_urlsafe(32)`) into the git-ignored `.env`. `python -m aegis` refuses to start without a key or on a non-loopback host, and passes `debug=False` explicitly.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b06_ingest_requires_an_api_key`, `::test_b06_admin_reload_requires_an_api_key`, `::test_b06_wrong_api_key_is_rejected`, `::test_b06_entry_point_never_enables_debug` pass; `tests/test_auth.py` checks every endpoint, the empty-key case and the start-up refusal.
 - **Residual risk:** one shared key, no per-client keys, no rotation, no rate limit on guesses; anyone who reads `.env` (or a leaked shell history) has full access. No TLS, acceptable only because the service binds to loopback. That is why R-05 stays Medium.
+
+## B-07, Log injection and sensitive data in logs
+
+- **Risk IDs / CWE / ATT&CK:** R-06 / CWE-117 (improper output neutralization for logs), CWE-532 (sensitive information in log file) / T1070 (indicator removal: misleading the log reader), T1552 (unsecured credentials)
+- **Where (on tag `baseline-vulnerable`):** `aegis/routes.py:28` (`log.info("ingest headers=%s message=%s", dict(request.headers), raw.get("message"))`).
+- **How it was introduced:** logging all headers is a common debugging habit ("what did the client send?"), and the message is the most useful thing to log. Neither looks dangerous in a quick read.
+- **How it can be exploited (safe reproduction):** a message containing `\n2026-11-20 09:00:00 INFO aegis admin access granted` writes a second, forged log line that looks like the service's own; every request's `X-API-Key` and `Authorization` headers are written to the log in clear text, as is any `password=` inside a message. Reproduction: `tests/test_seeded_bugs.py::test_b07_*` fail on the baseline (the token marker and the test API key appear in the captured log; a record contains a newline).
+- **Impact on this app (C/I/A):** C high (API keys and bearer tokens readable by anyone with log access), I medium (forged lines mislead the analyst), A low.
+- **Blast radius beyond this app:** logs are copied to more places than code (terminals, CI output, SIEMs, support tickets), so a credential in a log spreads further than one in a repository. Leaked `X-API-Key` values undo B-06. Forged lines poison the incident timeline; if logs feed another detection system, forged lines can trigger or suppress its alerts.
+- **Likelihood x Impact before / after:** 3 x 3 = 9 (Medium) -> 1 x 3 = 3 (Low).
+- **The fix (PR #12):** the ingest handler no longer logs headers; it logs `src`, `user` and `message` through `aegis.logsafe.clean()`, which redacts bearer/basic tokens, `password=`/`token=`/`api_key=` values and `aegk_` keys, escapes CR/LF and other control characters (so a value can never start a new line), and caps the length. A `SanitizingFilter` on the `aegis` logger cleans the formatted message of every record as a safety net.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b07_credentials_in_headers_never_reach_the_log`, `::test_b07_newline_cannot_forge_a_log_line`, `::test_b07_password_in_message_is_redacted` pass; `tests/test_logsafe.py` unit-tests escaping, redaction, truncation and the filter.
+- **Residual risk:** redaction is pattern based: a secret in an unexpected format (say, a bare random string in a message) is still logged. Loggers outside `aegis` (Werkzeug's access log) are not filtered; they log the request line, which never carries the key in this API.
