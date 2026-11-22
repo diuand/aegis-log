@@ -1,0 +1,26 @@
+{
+  "intel_hit": {
+    "ts": "2026-11-20T08:14:02Z", "src_ip": "198.51.100.23", "dst_ip": "192.0.2.10",
+    "user": "jdoe", "message": "vpn: authentication failure for jdoe"
+  },
+  "clean": {
+    "ts": "2026-11-20T08:15:40Z", "src_ip": "192.0.2.44", "dst_ip": "192.0.2.10",
+    "user": "jdoe", "message": "vpn: authentication failure for jdoe"
+  },
+  "ag001_positive": {
+    "ts": "2026-11-20T09:01:11Z", "src_ip": "192.0.2.61", "dst_ip": "192.0.2.10",
+    "user": "oracle", "message": "sshd: Invalid user oracle from 192.0.2.61 port 50122"
+  },
+  "ag001_negative": {
+    "ts": "2026-11-20T09:02:30Z", "src_ip": "192.0.2.61", "dst_ip": "192.0.2.10",
+    "user": "mpopescu", "message": "sshd: Failed password for mpopescu from 192.0.2.61 port 50190"
+  },
+  "ag002_positive": {
+    "ts": "2026-11-20T10:30:00Z", "src_ip": "192.0.2.88", "dst_ip": "192.0.2.10",
+    "user": "admin", "message": "sshd: Accepted password for admin from 192.0.2.88 port 41000"
+  },
+  "ag002_negative": {
+    "ts": "2026-11-20T10:31:00Z", "src_ip": "192.0.2.88", "dst_ip": "192.0.2.10",
+    "user": "backup", "message": "sshd: Accepted publickey for backup from 192.0.2.88 port 41002"
+  }
+}
