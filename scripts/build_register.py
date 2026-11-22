@@ -36,8 +36,10 @@ ROWS = [
         "asset": "Stored events and the host filesystem",
         "threat": "Analyst query parameters reach SQL and file paths unchecked (injection, traversal)",
         "ref": "T1190 / CWE-89, CWE-22", "bugs": "B-02, B-03", "L": 4, "I": 4,
-        "control": "Planned: bound SQL parameters; report names allowlisted and confined to reports/",
-        "RL": 4, "RI": 4, "evidence": "", "status": "Open",
+        "control": "B-02 closed: the search query uses a bound parameter, so input is data, never SQL. B-03 still open (reports). Likelihood 4->3 for now: one of the two injection paths is gone.",
+        "RL": 3, "RI": 4,
+        "evidence": "tests/test_seeded_bugs.py::test_b02_*; aegis/store.py",
+        "status": "Open",
     },
     {
         "id": "R-03", "register": "Internal",
