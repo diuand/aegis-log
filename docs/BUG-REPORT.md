@@ -14,7 +14,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-05 | No ingest validation or size cap | R-04 | fixed (PR #10) |
 | B-06 | No authentication; `debug=True` | R-05 | fixed (PR #11) |
 | B-07 | Log injection and secrets in logs | R-06 | fixed (PR #12) |
-| B-08 | Unpinned and vulnerable dependencies | R-07 | open |
+| B-08 | Unpinned and vulnerable dependencies | R-07 | fixed (PR #13) |
 | B-09 | Insecure CI workflow | R-08 | fixed (PR #4) |
 | B-10 | Poisoned agent memory; no agent permission rules | R-09 | fixed (PR #5) |
 
@@ -137,3 +137,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #12):** the ingest handler no longer logs headers; it logs `src`, `user` and `message` through `aegis.logsafe.clean()`, which redacts bearer/basic tokens, `password=`/`token=`/`api_key=` values and `aegk_` keys, escapes CR/LF and other control characters (so a value can never start a new line), and caps the length. A `SanitizingFilter` on the `aegis` logger cleans the formatted message of every record as a safety net.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b07_credentials_in_headers_never_reach_the_log`, `::test_b07_newline_cannot_forge_a_log_line`, `::test_b07_password_in_message_is_redacted` pass; `tests/test_logsafe.py` unit-tests escaping, redaction, truncation and the filter.
 - **Residual risk:** redaction is pattern based: a secret in an unexpected format (say, a bare random string in a message) is still logged. Loggers outside `aegis` (Werkzeug's access log) are not filtered; they log the request line, which never carries the key in this API.
+
+## B-08, Unpinned dependencies and a known-vulnerable version
+
+- **Risk IDs / CWE / ATT&CK:** R-07 / CWE-1104 (use of unmaintained third-party components), CWE-1395 (dependency on vulnerable third-party component), OWASP A06:2021 / T1195.001 (compromise software dependencies)
+- **Where (on tag `baseline-vulnerable`):** `requirements.txt:1-3` (`flask`, `pydantic`, `pyyaml` unpinned), `requirements.txt:4` (`requests==2.31.0`).
+- **How it was introduced:** unpinned names "always get the latest", which sounds safer; the one pinned package was pinned long ago and never revisited.
+- **How it can be exploited:** `pip-audit -r requirements.txt` on the baseline reports three advisories for `requests` 2.31.0: PYSEC-2026-1873 / **CVE-2024-35195** (a `Session` that first used `verify=False` keeps skipping TLS certificate checks for later requests to the same host), PYSEC-2026-1872 / **CVE-2024-47081** (`.netrc` credentials can leak to the wrong host via a crafted URL) and PYSEC-2026-2275 / **CVE-2026-25645**. `requests` is what `MispProvider` uses to call the intel platform with its API key, so the first two touch exactly the B-01 credential. Unpinned packages mean two installs a day apart can run different code, including a hijacked release. Reproduction: `tests/test_seeded_bugs.py::test_b08_*` fail on the baseline; `pip-audit` output above. No exploit was run.
+- **Impact on this app (C/I/A):** C medium-high (intel key and TLS integrity of intel lookups), I medium (unreviewed upstream code), A low.
+- **Blast radius beyond this app:** a malicious or vulnerable package runs with the service user's rights on every install: developer laptops, CI runners (with their token, see B-09) and the grader's machine. Pins also make security fixes reviewable: an upgrade is a visible diff in a PR.
+- **Likelihood x Impact before / after:** 3 x 4 = 12 (Medium) -> 2 x 4 = 8 (Medium).
+- **The fix (PR #13):** every runtime dependency pinned with `==` (flask 3.1.3, pydantic 2.14.4, pyyaml 6.0.4, requests 2.34.2, all current releases). The three tracked exceptions in `.pip-audit-ignore` are removed with the file, so `pip-audit` (run by `scripts/audit_deps.py` in `make check` and the CI `dependencies` job) now fails on any known vulnerability in the full resolved tree.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b08_every_runtime_dependency_is_pinned_exactly`, `::test_b08_requests_is_past_the_known_cves` pass; `make check` reports "No known vulnerabilities found" with nothing ignored; the CI `pip-audit` job is green on this PR.
+- **Residual risk:** transitive dependencies (Werkzeug, Jinja2, urllib3...) are resolved at install time, not locked by hash; a new CVE in a pinned version is only caught at the next CI run (Dependabot is not enabled). This keeps R-07 at Medium.

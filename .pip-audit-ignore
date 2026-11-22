@@ -1,5 +1,0 @@
-# Tracked exceptions. Each line names the open seeded bug that owns it and is
-# removed by that bug's fix PR (enforced by tests/test_tracked_exceptions.py).
-PYSEC-2026-1873  # tracked: B-08 requests 2.31.0, CVE-2024-35195
-PYSEC-2026-1872  # tracked: B-08 requests 2.31.0, CVE-2024-47081
-PYSEC-2026-2275  # tracked: B-08 requests 2.31.0, CVE-2026-25645

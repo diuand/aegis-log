@@ -8,6 +8,5 @@ red, so a bug can never be closed silently.
 Each fix PR deletes exactly one line below.
 """
 
-OPEN_BUGS = {
-    "B-08",  # unpinned and vulnerable dependencies
-}
+# All ten seeded bugs are closed (B-08 was the last).
+OPEN_BUGS: set[str] = set()

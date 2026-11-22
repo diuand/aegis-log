@@ -86,8 +86,10 @@ ROWS = [
         "asset": "Python dependency tree",
         "threat": "Old or unpinned package with a known CVE is installed",
         "ref": "T1195.001 / OWASP A06", "bugs": "B-08", "L": 3, "I": 4,
-        "control": "Planned: exact pins, upgrade the vulnerable package, pip-audit in make check and CI",
-        "RL": 3, "RI": 4, "evidence": "", "status": "Open",
+        "control": "All four runtime dependencies pinned exactly; requests upgraded 2.31.0 -> 2.34.2 (CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed). pip-audit audits the full resolved tree in make check and CI with no ignores left. Likelihood 3->2: known CVEs are caught on every PR, but a new CVE in a pinned version appears between runs and transitive pins are not locked (no hash-locked lock file). Impact stays 4.",
+        "RL": 2, "RI": 4,
+        "evidence": "tests/test_seeded_bugs.py::test_b08_*; requirements.txt; CI job pip-audit; scripts/audit_deps.py",
+        "status": "Implemented",
     },
     {
         "id": "R-08", "register": "Operational",
