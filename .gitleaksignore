@@ -1,0 +1,5 @@
+# The fake intel key seeded on purpose for B-01 (baseline commit). It stays in
+# history by design so the bug is reproducible; it is a placeholder that was
+# never valid anywhere. Listed by exact fingerprint, so any other occurrence
+# of the key, or any new key, is still reported.
+d2981ef8cfd4bdbb0b3c437560b0cfc84e90bea6:aegis/config.py:aegis-intel-key:10

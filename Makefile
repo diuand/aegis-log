@@ -8,12 +8,16 @@ PY ?= python3
 endif
 PYTHON := $(BIN)/python
 
-.PHONY: setup run test lint check report register evidence-red
+.PHONY: setup hooks run test lint sast audit check report register \
+        evidence-red evidence-push evidence-gitleaks
 
 setup:
 	$(PY) -m venv .venv
 	$(PYTHON) -m pip install -q --upgrade pip
 	$(PYTHON) -m pip install -q -r requirements.txt -r requirements-dev.txt
+
+hooks:
+	$(PYTHON) -m pre_commit install
 
 run:
 	$(PYTHON) -m aegis
@@ -24,7 +28,15 @@ test:
 lint:
 	$(PYTHON) -m ruff check aegis tests scripts
 
-check: lint test
+sast:
+	$(PYTHON) -m bandit -q -r aegis
+
+audit:
+	$(PYTHON) scripts/audit_deps.py
+
+# lint + tests + security scans (bandit, pip-audit). gitleaks runs in the
+# pre-commit hook and in CI.
+check: lint test sast audit
 
 report:
 	$(PYTHON) scripts/make_report.py
@@ -32,9 +44,17 @@ report:
 register:
 	$(PYTHON) scripts/build_register.py
 
-# Runs the seeded-bug tests with strict xfail switched off, so every open bug
-# shows as a real failure. Saved as evidence on the baseline.
+# Seeded-bug tests with strict xfail switched off, so every open bug shows as
+# a real failure. Saved as evidence on the baseline.
 evidence-red:
 	-AEGIS_SHOW_RED=1 $(PYTHON) -m pytest -q -m seeded_bug --tb=line -rf > docs/evidence/baseline-red.txt
 	$(PYTHON) scripts/mask_evidence.py docs/evidence/baseline-red.txt
 	@tail -n 1 docs/evidence/baseline-red.txt
+
+evidence-push:
+	bash scripts/demo_push_refusal.sh > docs/evidence/push-refused-local.txt 2>&1
+	$(PYTHON) scripts/mask_evidence.py docs/evidence/push-refused-local.txt
+
+evidence-gitleaks:
+	bash scripts/demo_gitleaks_refusal.sh > docs/evidence/gitleaks-refused.txt 2>&1
+	$(PYTHON) scripts/mask_evidence.py docs/evidence/gitleaks-refused.txt

@@ -13,7 +13,7 @@ def load_rules(rules_dir: Path) -> list[dict]:
     rules = []
     for path in sorted(Path(rules_dir).glob("*.yaml")):
         with open(path, encoding="utf-8") as fh:
-            rules.append(yaml.load(fh, Loader=yaml.Loader))
+            rules.append(yaml.load(fh, Loader=yaml.Loader))  # tracked: B-04 # nosec B506
     return rules
 
 
@@ -38,7 +38,7 @@ def apply_rules(rules: list[dict], doc: dict) -> dict:
     for rule in rules:
         try:
             hit = matches(rule, doc)
-        except Exception:
+        except Exception:  # tracked: B-04 # nosec B112
             continue
         if hit:
             doc["tags"].append(f"rule:{rule['id']}")

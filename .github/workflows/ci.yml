@@ -1,0 +1,92 @@
+name: ci
+
+# Runs on every PR to main and on every push to main.
+# Trigger is `pull_request` (never `pull_request_target`): fork PRs get a
+# read-only token and no repository secrets, so untrusted code steals nothing.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  GITLEAKS_VERSION: "8.30.1"
+
+jobs:
+  lint-test:
+    name: ruff + pytest + import check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check aegis tests scripts
+      - run: python -m pytest -q
+      - name: build/import check
+        run: python -c "from aegis import create_app; print('import ok')"
+
+  sast:
+    name: bandit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r requirements-dev.txt
+      - run: bandit -q -r aegis
+
+  dependencies:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r requirements-dev.txt
+      - name: pip-audit (full resolved tree; tracked exceptions come from .pip-audit-ignore)
+        run: python scripts/audit_deps.py
+
+  secrets:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: install gitleaks (release binary, checksum verified)
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "${base}/${tarball}"
+          curl -sSfLO "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          tar -xzf "${tarball}" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: full-history scan (the seeded B-01 finding is listed by fingerprint in .gitleaksignore)
+        run: gitleaks git --config .gitleaks.toml --redact --verbose
+      - name: self-test, a freshly generated fake key must be refused
+        run: bash scripts/demo_gitleaks_refusal.sh

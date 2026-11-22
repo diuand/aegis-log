@@ -1,0 +1,27 @@
+# make evidence-push: local pre-push guard (scripts/hooks/protect_main_push.sh)
+# run 2026-11-22T18:11Z in a temporary clone with a local bare remote
+
+# Direct push to main
+$ git push origin HEAD:main
+  refused: direct push to main. Open a pull request instead.
+  error: failed to push some refs to '<local-path>'
+  exit code: 1
+
+# Push of a feature branch (allowed)
+$ git push origin feature/demo
+  To <local-path>
+   * [new branch]      feature/demo -> feature/demo
+  exit code: 0
+
+# Force push that rewrites the feature branch
+$ git push --force origin feature/demo
+  refused: non-fast-forward (force) push to feature/demo
+  error: failed to push some refs to '<local-path>'
+  exit code: 1
+
+# Deleting main
+$ git push origin :main
+  refused: deleting main is not allowed
+  error: failed to push some refs to '<local-path>'
+  exit code: 1
+
