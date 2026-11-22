@@ -9,6 +9,5 @@ Each fix PR deletes exactly one line below.
 """
 
 OPEN_BUGS = {
-    "B-07",  # log injection and secrets in logs
     "B-08",  # unpinned and vulnerable dependencies
 }

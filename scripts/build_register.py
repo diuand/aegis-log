@@ -76,8 +76,10 @@ ROWS = [
         "asset": "Service logs",
         "threat": "Forged log lines mislead the analyst; credentials and tokens are written to logs",
         "ref": "T1070 / CWE-117, CWE-532", "bugs": "B-07", "L": 3, "I": 3,
-        "control": "Planned: escape control characters, redact secrets, never log request headers",
-        "RL": 3, "RI": 3, "evidence": "", "status": "Open",
+        "control": "Request headers are never logged. Untrusted values go through aegis.logsafe.clean() (control characters escaped, bearer tokens, password=/token=/api_key= values and aegk_ keys redacted, length capped) and a SanitizingFilter on the aegis logger cleans every record as a safety net. Likelihood 3->1: forging a line or leaking a header now needs a code change that review and tests would catch. Impact stays 3.",
+        "RL": 1, "RI": 3,
+        "evidence": "tests/test_seeded_bugs.py::test_b07_*; tests/test_logsafe.py; aegis/logsafe.py",
+        "status": "Implemented",
     },
     {
         "id": "R-07", "register": "External",

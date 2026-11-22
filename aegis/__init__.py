@@ -6,6 +6,7 @@ from flask import Flask
 
 from aegis.config import Settings, load_settings
 from aegis.intel import LocalFeedProvider
+from aegis.logsafe import SanitizingFilter
 from aegis.normalize import MAX_BODY_BYTES
 from aegis.rules import load_rules
 from aegis.store import EventStore
@@ -14,6 +15,9 @@ from aegis.store import EventStore
 def create_app(settings: Settings | None = None) -> Flask:
     settings = settings or load_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    aegis_log = logging.getLogger("aegis")
+    if not any(isinstance(f, SanitizingFilter) for f in aegis_log.filters):
+        aegis_log.addFilter(SanitizingFilter())  # safety net behind logsafe.clean()
 
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES  # larger bodies get 413

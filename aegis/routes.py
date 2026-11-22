@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
 from aegis.intel import enrich
+from aegis.logsafe import clean
 from aegis.normalize import RawEvent, normalize
 from aegis.reports import resolve_report
 from aegis.rules import RuleError, apply_rules, load_rules
@@ -64,7 +65,9 @@ def ingest():
         # Field names only: never echo the submitted values back.
         fields = sorted({".".join(map(str, e["loc"])) or "<root>" for e in exc.errors()})
         return jsonify(error="invalid event", fields=fields), 400
-    log.info("ingest headers=%s message=%s", dict(request.headers), event.message)
+    # Never log request headers (API keys, cookies); untrusted values go through clean().
+    log.info("ingest src=%s user=%s message=%s",
+             clean(event.src_ip), clean(event.user), clean(event.message))
     doc = normalize(event)
     enrich(doc, _svc("intel"))
     apply_rules(_svc("rules"), doc)
