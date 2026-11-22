@@ -26,6 +26,9 @@ BANNED = [
 ]
 # Patterns are code rules; docs, tests and this skill quote them on purpose.
 SCANNED = re.compile(r"^(aegis/|scripts/|\.github/workflows/|rules/|requirements[\w-]*\.txt$|\.claude/)")
+# Files that implement the controls name the forbidden commands in order to
+# block them (deny lists, the guard, its demo); scanning them is all noise.
+CONTROL_DEFINITIONS = re.compile(r"^(\.claude/hooks/|\.claude/settings\.json$|scripts/demo_agent_hook\.py$)")
 SENSITIVE = re.compile(r"^(\.github/|\.claude/|memory/|skills/|rules/|CLAUDE\.md$|scripts/hooks/)")
 IDS = re.compile(r"\b[RB]-\d\d\b")
 
@@ -53,7 +56,7 @@ def main() -> int:
 
     findings = []
     for path, text in added_lines(base):
-        if not SCANNED.match(path):
+        if not SCANNED.match(path) or CONTROL_DEFINITIONS.match(path):
             continue
         for name, rx in BANNED:
             if name == "unpinned requirement" and not path.startswith("requirements"):
