@@ -9,7 +9,6 @@ Each fix PR deletes exactly one line below.
 """
 
 OPEN_BUGS = {
-    "B-03",  # path traversal in /reports/<name>
     "B-04",  # unsafe YAML rule loading
     "B-05",  # no ingest validation or size cap
     "B-06",  # no authentication, debug=True

@@ -9,7 +9,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 |---|---|---|---|
 | B-01 | Hardcoded intel API key | R-01 | fixed (PR #6) |
 | B-02 | SQL injection in `/events/search` | R-02 | fixed (PR #7) |
-| B-03 | Path traversal in `/reports/<name>` | R-02 | open |
+| B-03 | Path traversal in `/reports/<name>` | R-02 | fixed (PR #8) |
 | B-04 | Unsafe YAML rule loading | R-03 | open |
 | B-05 | No ingest validation or size cap | R-04 | open |
 | B-06 | No authentication; `debug=True` | R-05 | open |
@@ -72,3 +72,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #7):** `search_by_user` passes the value as a bound parameter (`WHERE user = ?`), so SQLite treats it as data. The tracked bandit exception (`nosec B608`) is removed with the bug.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b02_tautology_does_not_dump_every_event`, `::test_b02_quote_in_a_name_is_treated_as_data`, `::test_b02_union_cannot_read_outside_the_events_table` pass; bandit is clean on `aegis/` with no exception.
 - **Residual risk:** other queries could be added later with string building; the `CLAUDE.md` banned-patterns table, `review.py` and bandit (B608) all flag that. Exact-match search still lets an authenticated caller enumerate users one guess at a time.
+
+## B-03, Path traversal in `/reports/<name>`
+
+- **Risk IDs / CWE / ATT&CK:** R-02 / CWE-22 (path traversal) / T1190 (exploit public-facing application), T1005 (data from local system)
+- **Where (on tag `baseline-vulnerable`):** `aegis/routes.py:43` (`<path:name>` converter accepts slashes) and `aegis/routes.py:45` (`os.path.join(reports_dir, name)`).
+- **How it was introduced:** `os.path.join` reads like safe path handling, and `<path:...>` lets reports live in sub-folders. Two less-known facts make it dangerous: `..` segments walk out of the folder, and joining an absolute path discards the base entirely.
+- **How it can be exploited (safe reproduction):** `GET /reports/..%2Fsecret.txt` returns a file next to the reports folder; `GET /reports/<url-encoded absolute path>` returns any file the service can read (source, `.env`, SSH keys). The tests plant a harmless marker file outside `reports/` and fetch it. Reproduction: `tests/test_seeded_bugs.py::test_b03_*` fail on the baseline (`assert 200 == 404`).
+- **Impact on this app (C/I/A):** C high (arbitrary file read as the service user), I none directly, A low.
+- **Blast radius beyond this app:** the readable files include `.env` (B-01's key after its fix, plus `AEGIS_API_KEY`), the SQLite store and the user's home directory, so one request can undo the secret hygiene from B-01 and the auth from B-06. On a shared analyst workstation it exposes other projects too.
+- **Likelihood x Impact before / after (R-02):** 3 x 4 = 12 after B-02 -> 1 x 4 = 4 (Low) with both fixed.
+- **The fix (PR #8):** the route uses the plain `<name>` converter (no slashes reach the handler); `aegis.reports.resolve_report()` accepts only names matching `[a-z0-9][a-z0-9-]{0,63}\.txt`, resolves the path (following symlinks) and refuses anything that is not inside `reports/` and an existing file. Every refusal is a plain 404, so the response does not reveal which check failed.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b03_dotdot_cannot_leave_reports_dir`, `::test_b03_absolute_path_cannot_be_requested`, `::test_b03_only_allowlisted_report_names_are_served` pass; `tests/test_reports_hardening.py` tests the resolver directly with traversal, Windows paths, hidden files and an outward symlink.
+- **Residual risk:** anyone who can write into `reports/` decides what is served (keep it owned by the service). The allowlist is a pattern, not a fixed list, so any new `.txt` report is served automatically; that is intended.
