@@ -1,12 +1,12 @@
 """HTTP endpoints."""
 
 import logging
-import os
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
 
 from aegis.intel import enrich
 from aegis.normalize import normalize
+from aegis.reports import resolve_report
 from aegis.rules import apply_rules, load_rules
 
 bp = Blueprint("aegis", __name__)
@@ -40,15 +40,12 @@ def search():
     return jsonify(count=len(results), events=results)
 
 
-@bp.get("/reports/<path:name>")
+@bp.get("/reports/<name>")  # plain converter: no slashes in the name
 def report(name: str):
-    path = os.path.join(_svc("settings").reports_dir, name)
-    try:
-        with open(path, encoding="utf-8") as fh:
-            body = fh.read()
-    except FileNotFoundError:
+    path = resolve_report(_svc("settings").reports_dir, name)
+    if path is None:
         abort(404)
-    return Response(body, mimetype="text/plain")
+    return Response(path.read_text(encoding="utf-8"), mimetype="text/plain")
 
 
 @bp.get("/intel/check")
