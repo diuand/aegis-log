@@ -7,7 +7,7 @@ from flask import Blueprint, Response, abort, current_app, jsonify, request
 from aegis.intel import enrich
 from aegis.normalize import normalize
 from aegis.reports import resolve_report
-from aegis.rules import apply_rules, load_rules
+from aegis.rules import RuleError, apply_rules, load_rules
 
 bp = Blueprint("aegis", __name__)
 log = logging.getLogger("aegis")
@@ -57,6 +57,10 @@ def intel_check():
 
 @bp.post("/admin/rules/reload")
 def reload_rules():
-    rules = load_rules(_svc("settings").rules_dir)
+    try:
+        rules = load_rules(_svc("settings").rules_dir)
+    except RuleError as exc:
+        # All or nothing: the previous rule set stays active.
+        return jsonify(error="rule set rejected, previous rules kept", detail=str(exc)), 400
     current_app.extensions["aegis"]["rules"] = rules
-    return jsonify(loaded=len(rules), ids=[r.get("id") for r in rules])
+    return jsonify(loaded=len(rules), ids=[r.id for r in rules])

@@ -46,8 +46,10 @@ ROWS = [
         "asset": "Detection rules (rules/*.yaml)",
         "threat": "A rule file runs code when loaded, or a broken rule silently switches detection off",
         "ref": "CWE-502", "bugs": "B-04", "L": 3, "I": 5,
-        "control": "Planned: yaml.safe_load, schema validation, all-or-nothing reload, CODEOWNERS on rules/",
-        "RL": 3, "RI": 5, "evidence": "", "status": "Open",
+        "control": "yaml.safe_load (plain data only) plus a strict pydantic schema (id format, severity enum, risk range, known fields, one operator, no extra keys, unique ids). Reload is all-or-nothing: a bad file gives 400 and the previous rules stay active. No silent except around matching. CODEOWNERS on rules/. Likelihood 3->1: code execution and silent rule loss are both removed at the root. Impact stays 5.",
+        "RL": 1, "RI": 5,
+        "evidence": "tests/test_seeded_bugs.py::test_b04_*; tests/test_rules_schema.py; .github/CODEOWNERS",
+        "status": "Implemented",
     },
     {
         "id": "R-04", "register": "External",
