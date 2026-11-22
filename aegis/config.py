@@ -18,6 +18,7 @@ class Settings:
     rules_dir: Path
     intel_feed: Path
     intel_api_key: str
+    api_key: str = ""  # clients send it as X-API-Key; empty means every request is refused
     host: str = "127.0.0.1"
     port: int = 5000
 
@@ -45,5 +46,6 @@ def load_settings() -> Settings:
         rules_dir=Path(env.get("AEGIS_RULES_DIR", BASE_DIR / "rules")),
         intel_feed=Path(env.get("AEGIS_INTEL_FEED", BASE_DIR / "data" / "intel_feed.json")),
         intel_api_key=env.get("AEGIS_INTEL_API_KEY", ""),
+        api_key=env.get("AEGIS_API_KEY", ""),
         port=int(env.get("AEGIS_PORT", "5000")),
     )
