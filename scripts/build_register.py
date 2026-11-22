@@ -26,8 +26,10 @@ ROWS = [
         "asset": "Threat-intel provider API key",
         "threat": "Key committed to source or history and harvested from a clone, fork or log",
         "ref": "T1552.001 / CWE-798", "bugs": "B-01", "L": 4, "I": 4,
-        "control": "Planned: key read from the environment, .env git-ignored, gitleaks in pre-commit and CI",
-        "RL": 4, "RI": 4, "evidence": "", "status": "Open",
+        "control": "Key read from AEGIS_INTEL_API_KEY (environment or git-ignored .env; .env.example holds placeholders only). gitleaks with a custom aegk_ rule in pre-commit and CI; the seeded value is ignored by exact fingerprint only. Likelihood 4->2: a new key is refused before commit and caught again in CI, but a human can still bypass the local hook and the old fake key stays in history by design. Impact stays 4.",
+        "RL": 2, "RI": 4,
+        "evidence": "tests/test_seeded_bugs.py::test_b01_*; docs/evidence/gitleaks-refused.txt; .gitleaks.toml; CI job gitleaks",
+        "status": "Implemented",
     },
     {
         "id": "R-02", "register": "Internal",

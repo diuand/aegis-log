@@ -7,7 +7,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 
 | ID | Bug | Risk | Status |
 |---|---|---|---|
-| B-01 | Hardcoded intel API key | R-01 | open |
+| B-01 | Hardcoded intel API key | R-01 | fixed (PR #6) |
 | B-02 | SQL injection in `/events/search` | R-02 | open |
 | B-03 | Path traversal in `/reports/<name>` | R-02 | open |
 | B-04 | Unsafe YAML rule loading | R-03 | open |
@@ -46,3 +46,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **Why prose alone is not a control:** `CLAUDE.md` saying "never push to main" is advice the model may weigh against other context, including a poisoned note. The deny rules and the hook run outside the model: the tool call is refused before it executes, whatever the context says.
 - **Proof the fix works:** `docs/evidence/hook-blocked.txt` (real PreToolUse payloads: pushes to main, force pushes, hook bypass, `.env` reads and guardrail edits blocked; ordinary work allowed; malformed input blocked); `tests/test_seeded_bugs.py::test_b10_*` now pass; `tests/test_agent_guard.py`.
 - **Residual risk:** a human can still edit `.claude/settings.json` or run git without the agent; review of memory PRs depends on the owner's attention (not required on GitHub Free). The guard parses commands with simple rules; an obfuscated command (for example built through variables) could slip past it, which is why the git-level pre-push hook and the governance workflow stay in place as further layers.
+
+## B-01, Hardcoded intel API key
+
+- **Risk IDs / CWE / ATT&CK:** R-01 / CWE-798 (use of hard-coded credentials) / T1552.001 (unsecured credentials: credentials in files)
+- **Where (on tag `baseline-vulnerable`):** `aegis/config.py:10` (`INTEL_API_KEY = "aegk_..."`), used at `aegis/config.py:32`.
+- **How it was introduced:** a module-level constant next to the other settings looks like configuration, and it "just works" on every machine. bandit does not flag it, because its hardcoded-password check only looks at names containing `password`, `secret` or `token`, not `KEY`.
+- **How it can be exploited (safe reproduction):** anyone with read access to a clone, fork, CI log or backup reads the key from `aegis/config.py` or from history (`git log -p -S aegk_`). With a real MISP key that means reading or poisoning the team's threat intel. Reproduction: `tests/test_seeded_bugs.py::test_b01_*` fail on the baseline; `gitleaks git --config .gitleaks.toml` reports `aegis-intel-key` at commit `d2981ef`.
+- **Impact on this app (C/I/A):** C high (the provider credential is public to every reader), I medium (a stolen key can add false indicators that change `risk_score`), A low.
+- **Blast radius beyond this app:** the key belongs to the intel platform, not to aegis-log, so the damage lands on every system that trusts that platform's indicators. It chains with B-09 (any injected CI step can read it), B-07 (keys travelled into logs) and B-10 (an unrestricted agent could paste it into a prompt or commit). Rotating it needs the platform owner, and history keeps the old value forever.
+- **Likelihood x Impact before / after:** 4 x 4 = 16 (High) -> 2 x 4 = 8 (Medium).
+- **The fix (PR #6):** `aegis/config.py` reads `AEGIS_INTEL_API_KEY` from the environment or the git-ignored `.env` (a small KEY=VALUE parser, no extra dependency); the default is empty. `.env.example` documents the variable with an empty placeholder, and `make setup` creates `.env` from it. gitleaks (default rules plus the `aegk_` rule) runs in pre-commit and in CI since phase 3; `.gitleaksignore` exempts only the seeded commit's exact fingerprint, so any new occurrence is still reported.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b01_no_credential_literal_in_source`, `::test_b01_intel_key_comes_from_environment`, `::test_b01_intel_key_is_empty_when_not_configured` pass; `docs/evidence/gitleaks-refused.txt` shows a freshly generated key being refused; the CI `gitleaks` job scans full history on every PR.
+- **Residual risk:** the fake key stays in git history by design (the bug must stay reproducible); with a real key the only fix would be rotation. A developer can still skip the local hook; CI catches the push afterwards, but by then the key is on GitHub and must be rotated. `.env` on a laptop is plaintext; SOPS/age was not added (optional in the spec).

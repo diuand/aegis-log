@@ -15,6 +15,7 @@ setup:
 	$(PY) -m venv .venv
 	$(PYTHON) -m pip install -q --upgrade pip
 	$(PYTHON) -m pip install -q -r requirements.txt -r requirements-dev.txt
+	$(PYTHON) scripts/init_env.py
 
 hooks:
 	$(PYTHON) -m pre_commit install
