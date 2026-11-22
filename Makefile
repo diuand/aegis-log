@@ -9,7 +9,7 @@ endif
 PYTHON := $(BIN)/python
 
 .PHONY: setup hooks run test lint sast audit check report register \
-        evidence-red evidence-push evidence-gitleaks
+        evidence-red evidence-push evidence-gitleaks evidence-hook review
 
 setup:
 	$(PY) -m venv .venv
@@ -58,3 +58,10 @@ evidence-push:
 evidence-gitleaks:
 	bash scripts/demo_gitleaks_refusal.sh > docs/evidence/gitleaks-refused.txt 2>&1
 	$(PYTHON) scripts/mask_evidence.py docs/evidence/gitleaks-refused.txt
+
+evidence-hook:
+	$(PYTHON) scripts/demo_agent_hook.py > docs/evidence/hook-blocked.txt
+
+# Mechanical pass of skills/review-pr against main.
+review:
+	$(PYTHON) skills/review-pr/review.py

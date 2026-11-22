@@ -92,8 +92,10 @@ ROWS = [
         "asset": "AI coding agent",
         "threat": "A poisoned memory note steers the agent; no permission rules stop pushes to main or secret reads",
         "ref": "ATLAS AML.T0051 / context poisoning", "bugs": "B-10", "L": 3, "I": 4,
-        "control": "Planned: memory via PR + CODEOWNERS, deny rules, PreToolUse guard hook",
-        "RL": 3, "RI": 4, "evidence": "", "status": "Open",
+        "control": "Poisoned note deleted and no longer imported; memory lives in memory/ and changes only by PR (CODEOWNERS). .claude/settings.json deny rules plus a PreToolUse guard that blocks pushes to main, force pushes, hook bypasses, secret reads and guardrail edits, and fails closed. Likelihood 3->2: a new poisoned note could still be merged by a careless review, but the actions it asks for are blocked. Impact stays 4.",
+        "RL": 2, "RI": 4,
+        "evidence": "docs/evidence/hook-blocked.txt; tests/test_seeded_bugs.py::test_b10_*; tests/test_agent_guard.py; .claude/settings.json",
+        "status": "Implemented",
     },
     {
         "id": "R-10", "register": "Operational",

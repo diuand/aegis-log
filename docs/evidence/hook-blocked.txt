@@ -1,0 +1,31 @@
+# make evidence-hook: PreToolUse guard decisions (.claude/hooks/guard.py)
+# exit 2 = blocked before the tool runs, exit 0 = allowed
+
+BLOCKED  exit 2  Bash: git push origin main
+         aegis guard: blocked: push to main; open a pull request instead
+BLOCKED  exit 2  Bash: git push origin HEAD:main
+         aegis guard: blocked: push to main; open a pull request instead
+BLOCKED  exit 2  Bash: git push --force origin fix/b-02-sql-injection
+         aegis guard: blocked: force push
+BLOCKED  exit 2  Bash: git push origin +fix/b-02-sql-injection
+         aegis guard: blocked: force push (+refspec)
+BLOCKED  exit 2  Bash: git push origin :main
+         aegis guard: blocked: push to main; open a pull request instead
+BLOCKED  exit 2  Bash: git commit -m 'quick fix' --no-verify
+         aegis guard: blocked: bypassing git hooks is not allowed
+BLOCKED  exit 2  Bash: make test && git push origin main
+         aegis guard: blocked: push to main; open a pull request instead
+BLOCKED  exit 2  Bash: cat .env
+         aegis guard: blocked: access to a secret file (.env)
+BLOCKED  exit 2  Read: .env
+         aegis guard: blocked: access to a secret file (.env)
+BLOCKED  exit 2  Read: secrets/intel.key
+         aegis guard: blocked: access to a secret file (secrets/intel.key)
+BLOCKED  exit 2  Edit: .claude/hooks/guard.py
+         aegis guard: blocked: editing the agent guardrails needs a human-reviewed PR
+allowed  exit 0  Bash: git status
+allowed  exit 0  Bash: git push -u origin fix/b-02-sql-injection
+allowed  exit 0  Read: .env.example
+allowed  exit 0  Bash: make check
+
+BLOCKED  exit 2  malformed input (fails closed)

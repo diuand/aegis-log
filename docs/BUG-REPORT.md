@@ -16,7 +16,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-07 | Log injection and secrets in logs | R-06 | open |
 | B-08 | Unpinned and vulnerable dependencies | R-07 | open |
 | B-09 | Insecure CI workflow | R-08 | fixed (PR #4) |
-| B-10 | Poisoned agent memory; no agent permission rules | R-09 | open |
+| B-10 | Poisoned agent memory; no agent permission rules | R-09 | fixed (PR #5) |
 
 ---
 
@@ -32,3 +32,17 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix:** PR #4 deletes `ci-baseline.yml`. `ci.yml` (added in phase 3) uses `pull_request` only, declares `permissions: contents: read`, pins every action to a full commit SHA with the tag in a comment, sets `persist-credentials: false`, and a new `workflow-lint` job runs `zizmor` on every PR, with online audits that check each pinned SHA belongs to its action.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b09_no_workflow_uses_pull_request_target`, `::test_b09_workflow_tokens_are_least_privilege`, `::test_b09_every_action_is_pinned_to_a_full_sha` are now ordinary must-pass tests; the CI `zizmor` job is green on this PR.
 - **Residual risk:** a pinned SHA is only as trustworthy as the code it points to; updates must be reviewed (Dependabot is not enabled). Someone with write access can still edit a workflow; CODEOWNERS requests review on `.github/` but cannot require it on GitHub Free.
+
+## B-10, Poisoned agent memory and no agent permission rules
+
+- **Risk IDs / CWE / ATT&CK:** R-09 / MITRE ATLAS AML.T0051 (LLM prompt injection, here through persistent context: memory poisoning) / no CWE fits exactly; closest is CWE-1427 (improper neutralization of input used for LLM prompting).
+- **Where (on tag `baseline-vulnerable`):** `.claude/memory/workflow-shortcuts.md:3-5` (the note), `CLAUDE.md:5` (imports it into every session); `.claude/settings.json` absent (no deny rules, no hooks).
+- **How it was introduced:** the note reads like a harmless team preference ("the owner prefers speed"). Memory files were never reviewed, so nothing questioned it, and it sat in the one place the agent always reads.
+- **How it can be exploited (safe reproduction):** the note itself is inert text and runs nothing. The exploit is behavioural: an agent that trusts its memory would push small changes straight to `main`, skip tests and commit with hook bypasses, defeating R-10's controls from inside. Reproduction: `tests/test_seeded_bugs.py::test_b10_*` fail on the baseline (the note matches the poison pattern; `.claude/settings.json` and the guard do not exist).
+- **Impact on this app (C/I/A):** I high (unreviewed code lands on `main`), C medium (nothing stopped the agent from reading `.env`), A low.
+- **Blast radius beyond this app:** a poisoned instruction persists across every session and every developer who uses the agent on this repo. It chains with B-09 (a CI change pushed without review) and B-01 (an agent allowed to read `.env` can paste a real key into a commit or a chat). If the repository is used as context elsewhere, the note travels with it.
+- **Likelihood x Impact before / after:** 3 x 4 = 12 (Medium) -> 2 x 4 = 8 (Medium).
+- **The fix (PR #5):** the note is deleted and `CLAUDE.md` now imports only `memory/MEMORY.md`. Memory and skills live in `memory/` and `skills/`, owned by CODEOWNERS, so changes need a PR. `.claude/settings.json` adds deny rules (push to main, force push, hook bypass, `.env` and `secrets/` reads, guardrail edits) and a `PreToolUse` hook (`.claude/hooks/guard.sh` -> `guard.py`) that checks every Bash, Read, Edit, Write, Grep call and fails closed. The original note is kept quarantined in `memory/quarantined-workflow-shortcuts.md` as a record, marked so it is never imported.
+- **Why prose alone is not a control:** `CLAUDE.md` saying "never push to main" is advice the model may weigh against other context, including a poisoned note. The deny rules and the hook run outside the model: the tool call is refused before it executes, whatever the context says.
+- **Proof the fix works:** `docs/evidence/hook-blocked.txt` (real PreToolUse payloads: pushes to main, force pushes, hook bypass, `.env` reads and guardrail edits blocked; ordinary work allowed; malformed input blocked); `tests/test_seeded_bugs.py::test_b10_*` now pass; `tests/test_agent_guard.py`.
+- **Residual risk:** a human can still edit `.claude/settings.json` or run git without the agent; review of memory PRs depends on the owner's attention (not required on GitHub Free). The guard parses commands with simple rules; an obfuscated command (for example built through variables) could slip past it, which is why the git-level pre-push hook and the governance workflow stay in place as further layers.
