@@ -1,0 +1,9 @@
+id: AG-002
+title: Successful interactive login by the shared admin account
+severity: high
+risk: 30
+when:
+  user.name:
+    equals: "admin"
+  message:
+    contains: "accepted"

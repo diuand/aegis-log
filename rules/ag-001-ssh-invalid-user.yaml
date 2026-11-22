@@ -1,0 +1,7 @@
+id: AG-001
+title: SSH login attempt for an account that does not exist
+severity: medium
+risk: 25
+when:
+  message:
+    contains: "invalid user"
