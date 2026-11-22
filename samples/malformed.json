@@ -1,0 +1,12 @@
+[
+  {"name": "empty object", "body": {}},
+  {"name": "missing message", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": "jdoe"}},
+  {"name": "timestamp not a date", "body": {"ts": "yesterday", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": "jdoe", "message": "x"}},
+  {"name": "ip out of range", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.300", "dst_ip": "192.0.2.10", "user": "jdoe", "message": "x"}},
+  {"name": "user with spaces and markup", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": "<script> admin", "message": "x"}},
+  {"name": "user is a number", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": 42, "message": "x"}},
+  {"name": "nested object as message", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": "jdoe", "message": {"a": 1}}},
+  {"name": "unexpected extra field", "body": {"ts": "2026-11-20T08:00:00Z", "src_ip": "192.0.2.1", "dst_ip": "192.0.2.10", "user": "jdoe", "message": "x", "risk_score": 0}},
+  {"name": "json string instead of object", "body": "hello"},
+  {"name": "json null", "body": null}
+]

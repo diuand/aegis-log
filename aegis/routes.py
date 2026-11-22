@@ -3,9 +3,11 @@
 import logging
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
+from pydantic import ValidationError
+from werkzeug.exceptions import HTTPException
 
 from aegis.intel import enrich
-from aegis.normalize import normalize
+from aegis.normalize import RawEvent, normalize
 from aegis.reports import resolve_report
 from aegis.rules import RuleError, apply_rules, load_rules
 
@@ -17,6 +19,18 @@ def _svc(name: str):
     return current_app.extensions["aegis"][name]
 
 
+@bp.app_errorhandler(HTTPException)
+def http_error(exc: HTTPException):
+    # JSON errors with the status name only (413, 404, 405, 400 ...).
+    return jsonify(error=exc.name), exc.code
+
+
+@bp.app_errorhandler(Exception)
+def unexpected_error(exc: Exception):
+    log.error("unhandled error: %s", exc.__class__.__name__)
+    return jsonify(error="internal error"), 500
+
+
 @bp.get("/health")
 def health():
     return jsonify(status="ok")
@@ -24,9 +38,17 @@ def health():
 
 @bp.post("/ingest")
 def ingest():
-    raw = request.get_json(force=True)
-    log.info("ingest headers=%s message=%s", dict(request.headers), raw.get("message"))
-    doc = normalize(raw)
+    raw = request.get_json(silent=True)
+    if not isinstance(raw, dict):
+        return jsonify(error="body must be a JSON object"), 400
+    try:
+        event = RawEvent.model_validate(raw)
+    except ValidationError as exc:
+        # Field names only: never echo the submitted values back.
+        fields = sorted({".".join(map(str, e["loc"])) or "<root>" for e in exc.errors()})
+        return jsonify(error="invalid event", fields=fields), 400
+    log.info("ingest headers=%s message=%s", dict(request.headers), event.message)
+    doc = normalize(event)
     enrich(doc, _svc("intel"))
     apply_rules(_svc("rules"), doc)
     event_id = _svc("store").add(doc)

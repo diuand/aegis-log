@@ -11,7 +11,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-02 | SQL injection in `/events/search` | R-02 | fixed (PR #7) |
 | B-03 | Path traversal in `/reports/<name>` | R-02 | fixed (PR #8) |
 | B-04 | Unsafe YAML rule loading | R-03 | fixed (PR #9) |
-| B-05 | No ingest validation or size cap | R-04 | open |
+| B-05 | No ingest validation or size cap | R-04 | fixed (PR #10) |
 | B-06 | No authentication; `debug=True` | R-05 | open |
 | B-07 | Log injection and secrets in logs | R-06 | open |
 | B-08 | Unpinned and vulnerable dependencies | R-07 | open |
@@ -98,3 +98,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #9):** `yaml.safe_load` (plain data only) and a strict pydantic `Rule` schema: id `AG-nnn`, severity enum, risk 1-50, only known fields, exactly one operator per condition, no unknown keys, unique ids. Any bad file raises `RuleError` and the whole set is rejected; the reload endpoint answers 400 and keeps the previous rules. The silent `except/continue` is gone. The tracked bandit exceptions (`nosec B506`, `nosec B112`) are removed.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b04_python_tags_in_rules_do_not_execute`, `::test_b04_reload_rejects_a_broken_rule_and_keeps_the_old_set`, `::test_b04_duplicate_rule_ids_are_rejected` pass; `tests/test_rules_schema.py` covers each schema rule; bandit is clean.
 - **Residual risk:** a schema-valid but wrong rule (bad logic, too broad, too narrow) still passes; that is what the positive/negative samples and code-owner review on `rules/` are for. Reload errors name the file and fields, not contents.
+
+## B-05, No input validation or size limit on ingest
+
+- **Risk IDs / CWE / ATT&CK:** R-04 / CWE-20 (improper input validation), CWE-400 (uncontrolled resource consumption) / T1499 (endpoint denial of service)
+- **Where (on tag `baseline-vulnerable`):** `aegis/routes.py:27` (`request.get_json(force=True)`, any JSON, any size), `aegis/normalize.py:7-16` (direct `raw["..."]` indexing, no types), `aegis/__init__.py` (no `MAX_CONTENT_LENGTH`).
+- **How it was introduced:** the happy path works with every well-formed sample, and `force=True` "helps" clients that forget the content type. Nothing in the samples is malformed, so tests stay green.
+- **How it can be exploited (safe reproduction):** a body without `src_ip` or a JSON array raises `KeyError`/`TypeError` in the normalizer (500); `src_ip: "not-an-ip"` is stored as if valid; a 70 KiB message is accepted, and nothing caps a multi-megabyte body. Reproduction: `tests/test_seeded_bugs.py::test_b05_*` fail on the baseline (`assert 500 == 400`, `assert 201 == 400`, `assert 201 == 413`).
+- **Impact on this app (C/I/A):** A high (a hostile sender crashes ingest or fills memory and disk), I medium (garbage IPs and types poison the store and enrichment), C low.
+- **Blast radius beyond this app:** a sensor that drops or mangles events blinds everything downstream: rules never see the event, reports undercount, and an attacker can hide real activity under noise. Unvalidated `user` values are the raw material for B-02 (second-order SQL) and B-07 (log forging).
+- **Likelihood x Impact before / after:** 4 x 3 = 12 (Medium) -> 2 x 3 = 6 (Low).
+- **The fix (PR #10):** `aegis.normalize.RawEvent` (pydantic): `ts` must be a datetime, `src_ip`/`dst_ip` real IP addresses, `user` 1-64 safe characters, `message` 1-4096 characters, no extra fields. `/ingest` returns 400 for non-objects and invalid events, listing field names only (values are never echoed). `MAX_CONTENT_LENGTH` = 64 KiB gives 413. JSON error handlers replace HTML error pages; an unexpected exception returns a generic 500 and logs only the exception class.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b05_*` pass; `tests/test_ingest_validation.py` runs every case in `samples/malformed.json`, a non-JSON body, value echoing and the generic 500.
+- **Residual risk:** there is no rate limiting: a flood of valid events still fills the SQLite file (out of scope for a loopback lab service, see `docs/PROJECT.md`). Validation checks shape, not truth: a forged but well-formed event is accepted.

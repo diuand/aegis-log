@@ -56,8 +56,10 @@ ROWS = [
         "asset": "Ingest pipeline",
         "threat": "Malformed or oversized telemetry from hostile sources crashes ingest; known-bad sources pass unflagged",
         "ref": "T1499 / CWE-20, CWE-400", "bugs": "B-05", "L": 4, "I": 3,
-        "control": "Planned: schema validation, body size cap, clean 400/413 errors; intel enrichment raises risk_score",
-        "RL": 4, "RI": 3, "evidence": "", "status": "Open",
+        "control": "pydantic RawEvent (datetime, IP addresses, bounded user and message, no extra fields); 64 KiB body cap (413); invalid input gives 400 with field names only; JSON error handlers keep tracebacks out of responses. Enrichment tags threat.indicator.matched and raises risk_score from 10 to 70 for feed IPs. Likelihood 4->2: crashes and oversized bodies are handled; a flood of valid events is still possible (no rate limit). Impact stays 3.",
+        "RL": 2, "RI": 3,
+        "evidence": "tests/test_seeded_bugs.py::test_b05_*; tests/test_ingest_validation.py; samples/malformed.json; tests/test_app.py::test_intel_match_changes_the_outcome",
+        "status": "Implemented",
     },
     {
         "id": "R-05", "register": "Internal",
