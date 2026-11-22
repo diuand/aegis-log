@@ -1,0 +1,12 @@
+# gitleaks configuration: the default rule set plus the aegis intel key format.
+title = "aegis-log gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "aegis-intel-key"
+description = "aegis-log threat-intel API key (aegk_ prefix)"
+regex = '''\baegk_[A-Za-z0-9]{24,}\b'''
+keywords = ["aegk_"]
+tags = ["key", "aegis"]

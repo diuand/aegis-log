@@ -1,0 +1,10 @@
+# Sensitive paths: the owner is auto-requested for review. On a private repo
+# on GitHub Free this review cannot be made required (see docs/PROJECT.md).
+/.github/             @diuand
+/.claude/             @diuand
+/memory/              @diuand
+/skills/              @diuand
+/rules/               @diuand
+/CLAUDE.md            @diuand
+/RISK-REGISTER.xlsx   @diuand
+/scripts/hooks/       @diuand

@@ -1,0 +1,30 @@
+# Install once per clone: .venv/bin/pre-commit install   (make hooks)
+# Installs both the pre-commit and the pre-push stages.
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-yaml
+        exclude: ^tests/
+
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged changes, default rules + aegk_ key format)
+        entry: gitleaks git --pre-commit --staged --redact --no-banner --config .gitleaks.toml
+        language: system
+        pass_filenames: false
+      - id: protect-main-push
+        name: refuse pushes to main and force pushes
+        entry: scripts/hooks/protect_main_push.sh
+        language: script
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
