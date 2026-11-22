@@ -10,7 +10,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-01 | Hardcoded intel API key | R-01 | fixed (PR #6) |
 | B-02 | SQL injection in `/events/search` | R-02 | fixed (PR #7) |
 | B-03 | Path traversal in `/reports/<name>` | R-02 | fixed (PR #8) |
-| B-04 | Unsafe YAML rule loading | R-03 | open |
+| B-04 | Unsafe YAML rule loading | R-03 | fixed (PR #9) |
 | B-05 | No ingest validation or size cap | R-04 | open |
 | B-06 | No authentication; `debug=True` | R-05 | open |
 | B-07 | Log injection and secrets in logs | R-06 | open |
@@ -85,3 +85,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #8):** the route uses the plain `<name>` converter (no slashes reach the handler); `aegis.reports.resolve_report()` accepts only names matching `[a-z0-9][a-z0-9-]{0,63}\.txt`, resolves the path (following symlinks) and refuses anything that is not inside `reports/` and an existing file. Every refusal is a plain 404, so the response does not reveal which check failed.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b03_dotdot_cannot_leave_reports_dir`, `::test_b03_absolute_path_cannot_be_requested`, `::test_b03_only_allowlisted_report_names_are_served` pass; `tests/test_reports_hardening.py` tests the resolver directly with traversal, Windows paths, hidden files and an outward symlink.
 - **Residual risk:** anyone who can write into `reports/` decides what is served (keep it owned by the service). The allowlist is a pattern, not a fixed list, so any new `.txt` report is served automatically; that is intended.
+
+## B-04, Unsafe YAML rule loading
+
+- **Risk IDs / CWE / ATT&CK:** R-03 / CWE-502 (deserialization of untrusted data), CWE-754 (improper check for exceptional conditions, the silent skip) / T1059.006 (command and scripting interpreter: Python)
+- **Where (on tag `baseline-vulnerable`):** `aegis/rules.py:16` (`yaml.load(fh, Loader=yaml.Loader)`), `aegis/rules.py:39-42` (`except Exception: continue` around matching), `aegis/routes.py:61-65` (reload accepts whatever loads).
+- **How it was introduced:** `yaml.load` with an explicit `Loader` silences PyYAML's old warning, so it looks deliberate and safe. The `try/except/continue` looks like robustness: one bad rule should not break ingest.
+- **How it can be exploited (safe reproduction):** a rule file containing a `!!python/object/apply:` tag makes the loader call any importable Python function at start-up or on `POST /admin/rules/reload`, i.e. code execution as the service user. The test uses a harmless canary function that only records it was called. Separately, a rule missing `when` is accepted and then silently skipped on every event: detection is off and nothing says so. Reproduction: `tests/test_seeded_bugs.py::test_b04_*` fail on the baseline (canary tripped, reload returns 200, duplicate ids accepted).
+- **Impact on this app (C/I/A):** C, I, A all high: code execution owns the process; a silently broken rule blinds the detection the service exists for.
+- **Blast radius beyond this app:** whoever can write a rule (a PR, a shared rules folder, a compromised CI step via B-09) gets code execution on every analyst machine that reloads rules. Silent rule failure means attacks pass as "clean" events, so downstream reports and humans trust a blind sensor. Chains with B-06: the unauthenticated reload endpoint let anyone trigger the load.
+- **Likelihood x Impact before / after:** 3 x 5 = 15 (High) -> 1 x 5 = 5 (Low).
+- **The fix (PR #9):** `yaml.safe_load` (plain data only) and a strict pydantic `Rule` schema: id `AG-nnn`, severity enum, risk 1-50, only known fields, exactly one operator per condition, no unknown keys, unique ids. Any bad file raises `RuleError` and the whole set is rejected; the reload endpoint answers 400 and keeps the previous rules. The silent `except/continue` is gone. The tracked bandit exceptions (`nosec B506`, `nosec B112`) are removed.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b04_python_tags_in_rules_do_not_execute`, `::test_b04_reload_rejects_a_broken_rule_and_keeps_the_old_set`, `::test_b04_duplicate_rule_ids_are_rejected` pass; `tests/test_rules_schema.py` covers each schema rule; bandit is clean.
+- **Residual risk:** a schema-valid but wrong rule (bad logic, too broad, too narrow) still passes; that is what the positive/negative samples and code-owner review on `rules/` are for. Reload errors name the file and fields, not contents.
