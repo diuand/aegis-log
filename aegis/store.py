@@ -36,9 +36,10 @@ class EventStore:
             return int(cur.lastrowid)
 
     def search_by_user(self, user: str) -> list[dict]:
-        query = f"SELECT doc FROM events WHERE user = '{user}' ORDER BY id"  # tracked: B-02 # nosec B608
+        # The value is bound by SQLite, never spliced into the SQL text.
         with self._connect() as conn:
-            return [json.loads(row[0]) for row in conn.execute(query)]
+            rows = conn.execute("SELECT doc FROM events WHERE user = ? ORDER BY id", (user,))
+            return [json.loads(row[0]) for row in rows]
 
     def all(self) -> list[dict]:
         with self._connect() as conn:

@@ -8,7 +8,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | ID | Bug | Risk | Status |
 |---|---|---|---|
 | B-01 | Hardcoded intel API key | R-01 | fixed (PR #6) |
-| B-02 | SQL injection in `/events/search` | R-02 | open |
+| B-02 | SQL injection in `/events/search` | R-02 | fixed (PR #7) |
 | B-03 | Path traversal in `/reports/<name>` | R-02 | open |
 | B-04 | Unsafe YAML rule loading | R-03 | open |
 | B-05 | No ingest validation or size cap | R-04 | open |
@@ -59,3 +59,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #6):** `aegis/config.py` reads `AEGIS_INTEL_API_KEY` from the environment or the git-ignored `.env` (a small KEY=VALUE parser, no extra dependency); the default is empty. `.env.example` documents the variable with an empty placeholder, and `make setup` creates `.env` from it. gitleaks (default rules plus the `aegk_` rule) runs in pre-commit and in CI since phase 3; `.gitleaksignore` exempts only the seeded commit's exact fingerprint, so any new occurrence is still reported.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b01_no_credential_literal_in_source`, `::test_b01_intel_key_comes_from_environment`, `::test_b01_intel_key_is_empty_when_not_configured` pass; `docs/evidence/gitleaks-refused.txt` shows a freshly generated key being refused; the CI `gitleaks` job scans full history on every PR.
 - **Residual risk:** the fake key stays in git history by design (the bug must stay reproducible); with a real key the only fix would be rotation. A developer can still skip the local hook; CI catches the push afterwards, but by then the key is on GitHub and must be rotated. `.env` on a laptop is plaintext; SOPS/age was not added (optional in the spec).
+
+## B-02, SQL injection in `/events/search`
+
+- **Risk IDs / CWE / ATT&CK:** R-02 / CWE-89 (SQL injection) / T1190 (exploit public-facing application)
+- **Where (on tag `baseline-vulnerable`):** `aegis/store.py:39` (f-string query), reached from `aegis/routes.py:37-39` (`user` query parameter).
+- **How it was introduced:** an f-string is the most natural way to write "find this user" in Python, and it works for every normal name, so tests with ordinary data pass.
+- **How it can be exploited (safe reproduction):** `GET /events/search?user=x' OR '1'='1` returns every stored event (all users, all source IPs); `user=' UNION SELECT ... --` reads values from outside the events table; a name with an apostrophe (`o'neil`) crashes the request with a 500. Reproduction: `tests/test_seeded_bugs.py::test_b02_*` fail on the baseline (`assert 2 == 0`, `assert 500 == 200`).
+- **Impact on this app (C/I/A):** C high (any caller dumps the whole event store), I medium (SQLite allows stacked writes through other APIs; here the read path is the main risk), A medium (crafted input crashes the endpoint).
+- **Blast radius beyond this app:** the event store holds usernames, internal IPs and threat-intel matches, which maps the network for an attacker and shows which of their IPs are already detected. Chains with B-06 (no authentication: anyone on the host can query) and B-05 (attacker-controlled usernames are stored unvalidated, ready for second-order injection).
+- **Likelihood x Impact before / after (R-02):** 4 x 4 = 16 (High) -> 3 x 4 = 12 after this PR; B-03 closes the rest of R-02.
+- **The fix (PR #7):** `search_by_user` passes the value as a bound parameter (`WHERE user = ?`), so SQLite treats it as data. The tracked bandit exception (`nosec B608`) is removed with the bug.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b02_tautology_does_not_dump_every_event`, `::test_b02_quote_in_a_name_is_treated_as_data`, `::test_b02_union_cannot_read_outside_the_events_table` pass; bandit is clean on `aegis/` with no exception.
+- **Residual risk:** other queries could be added later with string building; the `CLAUDE.md` banned-patterns table, `review.py` and bandit (B608) all flag that. Exact-match search still lets an authenticated caller enumerate users one guess at a time.
