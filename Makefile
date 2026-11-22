@@ -9,7 +9,8 @@ endif
 PYTHON := $(BIN)/python
 
 .PHONY: setup hooks run test lint sast audit check report register \
-        evidence-red evidence-push evidence-gitleaks evidence-hook review
+        evidence-red evidence-green evidence-push evidence-gitleaks evidence-hook \
+        evidence-enrichment review check-register
 
 setup:
 	$(PY) -m venv .venv
@@ -62,6 +63,18 @@ evidence-gitleaks:
 
 evidence-hook:
 	$(PYTHON) scripts/demo_agent_hook.py > docs/evidence/hook-blocked.txt
+
+# The same seeded-bug tests as evidence-red, on main: all must pass.
+evidence-green:
+	AEGIS_SHOW_RED=1 $(PYTHON) -m pytest -v -m seeded_bug --tb=short > docs/evidence/final-green.txt
+	$(PYTHON) scripts/mask_evidence.py docs/evidence/final-green.txt
+	@tail -n 1 docs/evidence/final-green.txt
+
+evidence-enrichment:
+	$(PYTHON) scripts/demo_enrichment.py > docs/evidence/enrichment.txt
+
+check-register:
+	$(PYTHON) scripts/check_register.py
 
 # Mechanical pass of skills/review-pr against main.
 review:

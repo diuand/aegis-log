@@ -2,8 +2,11 @@
 
 The baseline (tag `baseline-vulnerable`) plants ten bugs on purpose. Each
 has regression tests in `tests/test_seeded_bugs.py` that fail on the
-baseline (`docs/evidence/baseline-red.txt`). Each fix PR adds its full
-section below and closes the ID in `tests/bug_ledger.py`.
+baseline (`docs/evidence/baseline-red.txt`). Each fix PR added its full
+section below (in the order the bugs were fixed) and closed the ID in
+`tests/bug_ledger.py`. All ten are fixed; the green run is
+`docs/evidence/final-green.txt`. The "Bug chains" section at the end shows
+how the bugs combine and which controls break each step.
 
 | ID | Bug | Risk | Status |
 |---|---|---|---|
@@ -150,3 +153,41 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #13):** every runtime dependency pinned with `==` (flask 3.1.3, pydantic 2.14.4, pyyaml 6.0.4, requests 2.34.2, all current releases). The three tracked exceptions in `.pip-audit-ignore` are removed with the file, so `pip-audit` (run by `scripts/audit_deps.py` in `make check` and the CI `dependencies` job) now fails on any known vulnerability in the full resolved tree.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b08_every_runtime_dependency_is_pinned_exactly`, `::test_b08_requests_is_past_the_known_cves` pass; `make check` reports "No known vulnerabilities found" with nothing ignored; the CI `pip-audit` job is green on this PR.
 - **Residual risk:** transitive dependencies (Werkzeug, Jinja2, urllib3...) are resolved at install time, not locked by hash; a new CVE in a pinned version is only caught at the next CI run (Dependabot is not enabled). This keeps R-07 at Medium.
+
+## Bug chains
+
+Single bugs are bad; chained bugs are how real incidents happen. Each chain
+below worked on `baseline-vulnerable`, and each step is now broken by at
+least one control.
+
+### Chain 1: open port to full event dump to key theft (B-06 + B-02 + B-03)
+
+1. **B-06:** any local process or web page calls `127.0.0.1:5000` without a key.
+2. **B-02:** `GET /events/search?user=x' OR '1'='1` dumps every stored event: users, internal IPs, which attacker IPs are already flagged.
+3. **B-03:** `GET /reports/<encoded path to .env>` reads the service's secrets, including the provider key once B-01 moved it there.
+
+**Broken by:** the deny-by-default API key (step 1 returns 401), bound SQL parameters (step 2 returns nothing), the no-slash route plus allowlist and containment (step 3 returns 404). Any one of them stops the chain.
+
+### Chain 2: malicious PR to stolen credential (B-09 + B-01 + R-10)
+
+1. **B-09:** an outside PR changes `tests/conftest.py`; `pull_request_target` checks it out and runs it with a `write-all` token.
+2. **B-01:** the injected code reads `INTEL_API_KEY` from `aegis/config.py` and exfiltrates it, or pushes a backdoor straight to `main` with the token.
+3. **R-10:** on GitHub Free there is no branch protection to stop the pushed commit.
+
+**Broken by:** `pull_request` with `contents: read` and SHA-pinned actions (step 1 gets a read-only token and no secrets), the key living only in the environment (step 2 finds nothing), and the governance workflow turning red on any commit that did not come from a merged PR (step 3 becomes visible within a minute).
+
+### Chain 3: poisoned rule to blind sensor (B-04 + B-06 + B-07)
+
+1. **B-06:** anyone can call `POST /admin/rules/reload`.
+2. **B-04:** a rule file with a `!!python/object/apply` tag runs code during the reload, or a broken rule silently disables detection.
+3. **B-07:** the attacker sends events whose messages contain newlines, forging "all clear" lines in the log, while their real traffic goes untagged.
+
+**Broken by:** the API key on the admin endpoint, `safe_load` plus schema validation with all-or-nothing reload (a bad set returns 400 and the old rules stay), CODEOWNERS on `rules/`, and log escaping (one event per line).
+
+### Chain 4: poisoned memory to unreviewed main (B-10 + R-10 + B-08)
+
+1. **B-10:** the agent loads the memory note telling it to push small changes straight to `main` and skip hooks.
+2. **R-10:** it pushes a "small" dependency bump to `main` without a PR or tests.
+3. **B-08:** the bump pins a vulnerable or hijacked package version that nobody reviewed.
+
+**Broken by:** the note's removal and memory-by-PR, the `PreToolUse` guard and deny rules (step 1's actions are refused before they run), the pre-push hook and governance workflow (step 2), and pip-audit on every PR with exact pins (step 3).

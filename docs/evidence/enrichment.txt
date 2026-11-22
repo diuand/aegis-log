@@ -1,0 +1,9 @@
+# make evidence-enrichment: same pipeline, different source IPs
+sample           src_ip          risk  tags
+intel_hit        198.51.100.23     70  threat.indicator.matched
+                 threat.indicator: {"confidence": 85, "description": "credential-stuffing source seen against VPN portal", "ip": "198.51.100.23"}
+clean            192.0.2.44        10  -
+ag001_positive   192.0.2.61        35  rule:AG-001
+ag001_negative   192.0.2.61        10  -
+ag002_positive   192.0.2.88        40  rule:AG-002
+ag002_negative   192.0.2.88        10  -
