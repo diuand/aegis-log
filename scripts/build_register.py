@@ -66,8 +66,10 @@ ROWS = [
         "asset": "Ingest and admin endpoints",
         "threat": "Anyone who reaches the port can write events or reload rules; the Werkzeug debugger runs code",
         "ref": "CWE-306, CWE-489", "bugs": "B-06", "L": 4, "I": 5,
-        "control": "Planned: deny-by-default API key (constant-time compare), debug off, loopback bind",
-        "RL": 4, "RI": 5, "evidence": "", "status": "Open",
+        "control": "Deny-by-default before_request hook: every endpoint except /health needs X-API-Key, compared with hmac.compare_digest; an empty configured key refuses everyone. make setup writes a random key to the git-ignored .env and the service refuses to start without one. debug=False is explicit and the entry point only binds to loopback. Likelihood 4->2: one shared key, no per-client keys or rotation, so a leaked key still opens everything. Impact stays 5.",
+        "RL": 2, "RI": 5,
+        "evidence": "tests/test_seeded_bugs.py::test_b06_*; tests/test_auth.py; aegis/routes.py (require_api_key)",
+        "status": "Implemented",
     },
     {
         "id": "R-06", "register": "Internal",

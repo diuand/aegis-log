@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Create .env from .env.example on first setup (never overwrites an existing .env)."""
+"""Create .env on first setup with a random API key (never overwrites .env)."""
 
+import secrets
 import sys
 from pathlib import Path
 
@@ -12,8 +13,10 @@ def main() -> int:
     if target.exists():
         print(".env already exists, left unchanged")
         return 0
-    target.write_text((ROOT / ".env.example").read_text(encoding="utf-8"), encoding="utf-8")
-    print("created .env from .env.example (git-ignored)")
+    text = (ROOT / ".env.example").read_text(encoding="utf-8")
+    text = text.replace("AEGIS_API_KEY=\n", f"AEGIS_API_KEY={secrets.token_urlsafe(32)}\n")
+    target.write_text(text, encoding="utf-8")
+    print("created .env with a random AEGIS_API_KEY (git-ignored; read it from .env)")
     return 0
 
 

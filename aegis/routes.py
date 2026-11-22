@@ -1,5 +1,6 @@
 """HTTP endpoints."""
 
+import hmac
 import logging
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
@@ -17,6 +18,22 @@ log = logging.getLogger("aegis")
 
 def _svc(name: str):
     return current_app.extensions["aegis"][name]
+
+
+OPEN_ENDPOINTS = {"aegis.health"}
+
+
+@bp.before_app_request
+def require_api_key():
+    """Deny by default: every endpoint except /health needs the API key."""
+    if request.endpoint in OPEN_ENDPOINTS:
+        return None
+    expected = _svc("settings").api_key.encode()
+    supplied = request.headers.get("X-API-Key", "").encode()
+    # compare_digest takes the same time whether the first or last byte differs.
+    if not expected or not hmac.compare_digest(supplied, expected):
+        return jsonify(error="missing or invalid API key"), 401
+    return None
 
 
 @bp.app_errorhandler(HTTPException)

@@ -12,7 +12,7 @@ section below and closes the ID in `tests/bug_ledger.py`.
 | B-03 | Path traversal in `/reports/<name>` | R-02 | fixed (PR #8) |
 | B-04 | Unsafe YAML rule loading | R-03 | fixed (PR #9) |
 | B-05 | No ingest validation or size cap | R-04 | fixed (PR #10) |
-| B-06 | No authentication; `debug=True` | R-05 | open |
+| B-06 | No authentication; `debug=True` | R-05 | fixed (PR #11) |
 | B-07 | Log injection and secrets in logs | R-06 | open |
 | B-08 | Unpinned and vulnerable dependencies | R-07 | open |
 | B-09 | Insecure CI workflow | R-08 | fixed (PR #4) |
@@ -111,3 +111,16 @@ section below and closes the ID in `tests/bug_ledger.py`.
 - **The fix (PR #10):** `aegis.normalize.RawEvent` (pydantic): `ts` must be a datetime, `src_ip`/`dst_ip` real IP addresses, `user` 1-64 safe characters, `message` 1-4096 characters, no extra fields. `/ingest` returns 400 for non-objects and invalid events, listing field names only (values are never echoed). `MAX_CONTENT_LENGTH` = 64 KiB gives 413. JSON error handlers replace HTML error pages; an unexpected exception returns a generic 500 and logs only the exception class.
 - **Proof the fix works:** `tests/test_seeded_bugs.py::test_b05_*` pass; `tests/test_ingest_validation.py` runs every case in `samples/malformed.json`, a non-JSON body, value echoing and the generic 500.
 - **Residual risk:** there is no rate limiting: a flood of valid events still fills the SQLite file (out of scope for a loopback lab service, see `docs/PROJECT.md`). Validation checks shape, not truth: a forged but well-formed event is accepted.
+
+## B-06, No authentication on ingest and admin; Flask `debug=True`
+
+- **Risk IDs / CWE / ATT&CK:** R-05 / CWE-306 (missing authentication for critical function), CWE-489 (active debug code) / T1190 (exploit public-facing application), T1059.006 (Python, through the debugger console)
+- **Where (on tag `baseline-vulnerable`):** `aegis/routes.py:24-65` (every route open, including `POST /ingest` and `POST /admin/rules/reload`), `aegis/__main__.py:10` (`app.run(..., debug=True)`).
+- **How it was introduced:** "it only listens on localhost" feels like enough, and `debug=True` gives auto-reload and nice tracebacks during development, so it is left on.
+- **How it can be exploited (safe reproduction):** any local process, browser page doing a `fetch` to `127.0.0.1:5000`, or other user on a shared host can write fake events, read the store and reload rules. With `debug=True`, any exception serves the Werkzeug debugger, whose console runs Python as the service user (PIN protection is weak once the attacker can read local files, see B-03). Reproduction: `tests/test_seeded_bugs.py::test_b06_*` fail on the baseline (201 instead of 401; the AST check finds `debug=True`). The debugger itself was not triggered.
+- **Impact on this app (C/I/A):** C, I, A high: forged events, data reads, rule tampering; the debugger is full code execution.
+- **Blast radius beyond this app:** an unauthenticated ingest endpoint lets an attacker bury their real activity under forged clean events or plant fake alerts against someone else's IP. The debugger turns any bug (B-02, B-05) into code execution on the analyst's laptop, reaching `.env`, SSH keys and other projects. It also amplifies B-04: anyone could trigger a rule reload.
+- **Likelihood x Impact before / after:** 4 x 5 = 20 (High) -> 2 x 5 = 10 (Medium).
+- **The fix (PR #11):** a `before_app_request` hook denies by default: every endpoint except `/health` requires `X-API-Key`, compared with `hmac.compare_digest` (constant time) against `AEGIS_API_KEY`; an empty configured key refuses every request. `make setup` writes a random key (`secrets.token_urlsafe(32)`) into the git-ignored `.env`. `python -m aegis` refuses to start without a key or on a non-loopback host, and passes `debug=False` explicitly.
+- **Proof the fix works:** `tests/test_seeded_bugs.py::test_b06_ingest_requires_an_api_key`, `::test_b06_admin_reload_requires_an_api_key`, `::test_b06_wrong_api_key_is_rejected`, `::test_b06_entry_point_never_enables_debug` pass; `tests/test_auth.py` checks every endpoint, the empty-key case and the start-up refusal.
+- **Residual risk:** one shared key, no per-client keys, no rotation, no rate limit on guesses; anyone who reads `.env` (or a leaked shell history) has full access. No TLS, acceptable only because the service binds to loopback. That is why R-05 stays Medium.
