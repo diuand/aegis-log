@@ -82,8 +82,10 @@ ROWS = [
         "asset": "CI pipeline and repository token",
         "threat": "pull_request_target with a write-all token runs PR code; a retagged action runs with that token",
         "ref": "T1195.002 / CWE-829", "bugs": "B-09", "L": 3, "I": 5,
-        "control": "Planned: pull_request only, contents: read, SHA-pinned actions, zizmor lint",
-        "RL": 3, "RI": 5, "evidence": "", "status": "Open",
+        "control": "ci-baseline.yml deleted. ci.yml: pull_request trigger only, top-level permissions contents: read, every action pinned to a full SHA, persist-credentials: false, zizmor lints every workflow on every PR. Likelihood 3->1: the trigger and token that made the attack possible are gone and a linter blocks their return. Impact stays 5.",
+        "RL": 1, "RI": 5,
+        "evidence": "tests/test_seeded_bugs.py::test_b09_*; .github/workflows/ci.yml (workflow-lint job); docs/BUG-REPORT.md#b-09",
+        "status": "Implemented",
     },
     {
         "id": "R-09", "register": "Operational",
